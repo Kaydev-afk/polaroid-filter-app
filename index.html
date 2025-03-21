@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polaroid Filter App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            background-color: #f4f1ea;
+            color: #333;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+        #canvas-container {
+            position: relative;
+            display: inline-block;
+            margin-top: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+            max-width: 500px;
+            width: 100%;
+            background-color: white;
+        }
+        canvas {
+            width: 100%;
+            height: auto;
+            transition: all 0.3s ease-in-out;
+        }
+        .polaroid-frame {
+            padding: 10px 10px 50px 10px;
+            border-radius: 8px;
+            box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease-in-out;
+        }
+        input, button {
+            margin-top: 10px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        button {
+            padding: 12px 16px;
+            background-color: #ff7b54;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 8px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        button:hover {
+            background-color: #ff5733;
+            transform: scale(1.05);
+        }
+        .settings {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 3px 3px 15px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            transition: all 0.3s ease-in-out;
+            width: 100%;
+            max-width: 500px;
+        }
+        .settings label {
+            display: block;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .slider {
+            width: 100%;
+        }
+        #captionInput {
+            width: 80%;
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+            display: none; /* Hidden by default */
+        }
+        #downloadBtn {
+            margin-top: 20px;
+            padding: 12px 16px;
+            background-color: #54b5ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 8px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        #downloadBtn:hover {
+            background-color: #3e8ece;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <h1>Polaroid Filter App</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+
+    <div class="settings">
+        <label>Warmth: <input type="range" class="slider" id="warmth" min="0.8" max="1.3" step="0.01" value="1.1"></label>
+        <label>Noise: <input type="range" class="slider" id="noise" min="0" max="50" step="1" value="30"></label>
+        <button id="regenerateBtn">Regenerate</button>
+        <button id="toggleFrameBtn">Toggle Polaroid Frame</button>
+        <input type="text" id="captionInput" placeholder="Enter Polaroid caption...">
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <button id="downloadBtn">Download Image</button>
+
+    <script>
+        const imageUpload = document.getElementById("imageUpload");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const regenerateBtn = document.getElementById("regenerateBtn");
+        const toggleFrameBtn = document.getElementById("toggleFrameBtn");
+        const warmthInput = document.getElementById("warmth");
+        const noiseInput = document.getElementById("noise");
+        const canvasContainer = document.getElementById("canvas-container");
+        const captionInput = document.getElementById("captionInput");
+
+        let currentImage = null;
+        let polaroidFrameEnabled = false;
+        let captionText = "";
+
+        imageUpload.addEventListener("change", (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = function () {
+                        currentImage = img;
+                        processImage();
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function processImage() {
+            if (!currentImage) return;
+
+            const maxWidth = 500;
+            let scale = 1;
+            if (currentImage.width > maxWidth) {
+                scale = maxWidth / currentImage.width;
+            }
+
+            let canvasWidth = currentImage.width * scale;
+            let canvasHeight = currentImage.height * scale;
+            let extraHeight = polaroidFrameEnabled ? canvasHeight * 0.3 : 0;
+
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight + extraHeight;
+
+            if (polaroidFrameEnabled) {
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(currentImage, 10, 10, canvasWidth - 20, canvasHeight - 20);
+                drawCaption();
+            } else {
+                ctx.drawImage(currentImage, 0, 0, canvasWidth, canvasHeight);
+            }
+
+            applyPolaroidFilter();
+            addFilmGrain();
+        }
+
+        function drawCaption() {
+            ctx.fillStyle = "black";
+            ctx.font = "28px 'Permanent Marker', cursive";
+            ctx.textAlign = "center";
+            ctx.fillText(captionText, canvas.width / 2, canvas.height - 30);
+        }
+
+        function applyPolaroidFilter() {
+            const warmthFactor = parseFloat(warmthInput.value);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = data[i] * warmthFactor;
+                data[i + 1] = data[i + 1] * (1 + (warmthFactor - 1) / 2);
+                data[i + 2] = data[i + 2] * (1 - (warmthFactor - 1) / 2);
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function addFilmGrain() {
+            const noiseAmount = parseFloat(noiseInput.value);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const noise = (Math.random() - 0.5) * noiseAmount;
+                data[i] += noise;
+                data[i + 1] += noise;
+                data[i + 2] += noise;
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        captionInput.addEventListener("input", () => {
+            captionText = captionInput.value;
+            processImage();
+        });
+
+        toggleFrameBtn.addEventListener("click", () => {
+            polaroidFrameEnabled = !polaroidFrameEnabled;
+            captionInput.style.display = polaroidFrameEnabled ? "block" : "none";
+            processImage();
+        });
+
+        downloadBtn.addEventListener("click", () => {
+            const link = document.createElement("a");
+            link.download = "polaroid_image.png";
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    </script>
+</body>
+</html>
